@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пример встраивания Grinex Price Tracker</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .widget-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 30px auto;
+            border: none;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .widget-container iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
+            display: block;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        .code-block code {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
+        }
+        
+        @media (max-width: 768px) {
+            .widget-container iframe {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Пример встраивания Grinex Price Tracker через iframe</h1>
+        
+        <div class="note">
+            <strong>Важно:</strong> Замените <code>YOUR-RENDER-URL.onrender.com</code> на реальный URL вашего Render сервиса после деплоя.
+        </div>
+        
+        <h2>Виджет</h2>
+        <div class="widget-container">
+            <iframe 
+                id="priceWidget"
+                src="https://YOUR-RENDER-URL.onrender.com/client.html" 
+                title="Grinex Price Tracker"
+                allow="autoplay; clipboard-read; clipboard-write"
+                loading="lazy">
+            </iframe>
+        </div>
+        
+        <h2>Код для встраивания</h2>
+        <p>Скопируйте этот код и вставьте на свою страницу:</p>
+        
+        <div class="code-block">
+            <code>
+&lt;iframe <br>
+&nbsp;&nbsp;&nbsp;&nbsp;src="https://YOUR-RENDER-URL.onrender.com/client.html" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;width="100%" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;height="500" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;style="border: none; border-radius: 10px;" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;title="Grinex Price Tracker"&gt;<br>
+&lt;/iframe&gt;
+            </code>
+        </div>
+        
+        <h2>Адаптивный вариант с контейнером</h2>
+        <div class="code-block">
+            <code>
+&lt;div style="width: 100%; max-width: 600px; margin: 0 auto;"&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;iframe <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src="https://YOUR-RENDER-URL.onrender.com/client.html" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;width="100%" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;height="500" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;style="border: none; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);" <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;title="Grinex Price Tracker"&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/iframe&gt;<br>
+&lt;/div&gt;
+            </code>
+        </div>
+        
+        <h2>Минимальный вариант</h2>
+        <div class="code-block">
+            <code>
+&lt;iframe src="https://YOUR-RENDER-URL.onrender.com/client.html" width="600" height="500"&gt;&lt;/iframe&gt;
+            </code>
+        </div>
+    </div>
+</body>
+</html>
+

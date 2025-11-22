@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grinex Price Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .price-container {
+            margin: 40px 0;
+        }
+
+        .price-label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .price-value {
+            font-size: 96px;
+            font-weight: 700;
+            color: #667eea;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word;
+        }
+
+        .price-value.updating {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .price-value.updated {
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #999;
+            font-weight: 500;
+        }
+
+        .status.success {
+            color: #27ae60;
+        }
+
+        .status.error {
+            color: #e74c3c;
+        }
+
+        .status.loading {
+            color: #f39c12;
+        }
+
+        .last-update {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        .method-badge {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 6px 12px;
+            background: #e8f5e9;
+            color: #27ae60;
+            border-radius: 15px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .price-value {
+                font-size: 72px;
+                min-height: 100px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .price-value {
+                font-size: 56px;
+                min-height: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Grinex Price Tracker</h1>
+        <div class="subtitle">USDT/A7A5 - Последняя сделка</div>
+        
+        <div class="price-container">
+            <div class="price-label">Цена</div>
+            <div class="price-value" id="price">Загрузка...</div>
+            <div class="status loading" id="status">Подключение<span class="loading-spinner"></span></div>
+            <div class="last-update" id="lastUpdate"></div>
+            <div class="method-badge" id="methodBadge" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentPrice = null;
+        let updateInterval = null;
+        let retryCount = 0;
+        const MAX_RETRIES = 3;
+
+        function formatTime(date) {
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+        }
+
+        function formatMethod(method) {
+            if (!method) return '';
+            const methods = {
+                'window.gon.ticker.last': 'window.gon',
+                'table (Последние сделки)': 'таблица',
+                'text (Последние сделки)': 'текст',
+                'unknown': 'неизвестно'
+            };
+            return methods[method] || method;
+        }
+
+        async function loadPrice() {
+            const priceElement = document.getElementById('price');
+            const statusElement = document.getElementById('status');
+            const lastUpdateElement = document.getElementById('lastUpdate');
+            const methodBadge = document.getElementById('methodBadge');
+
+            try {
+                priceElement.classList.add('updating');
+                statusElement.innerHTML = 'Обновление<span class="loading-spinner"></span>';
+                statusElement.className = 'status loading';
+
+                // Запрос к API с таймаутом
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 секунд таймаут
+
+                try {
+                    const response = await fetch('/api/price?t=' + Date.now(), {
+                        signal: controller.signal,
+                        cache: 'no-cache'
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ошибка: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (!data.success || !data.price) {
+                        throw new Error(data.error || 'Цена не получена');
+                    }
+
+                    const price = data.price;
+
+                    // Обновляем цену только если она изменилась
+                    if (price !== currentPrice) {
+                        priceElement.textContent = price;
+                        priceElement.classList.remove('updating');
+                        priceElement.classList.add('updated');
+                        
+                        setTimeout(() => {
+                            priceElement.classList.remove('updated');
+                        }, 500);
+
+                        currentPrice = price;
+                    } else {
+                        priceElement.classList.remove('updating');
+                    }
+
+                    statusElement.innerHTML = '✓ Данные обновлены';
+                    statusElement.className = 'status success';
+                    
+                    if (data.updated) {
+                        const updateDate = new Date(data.updated);
+                        lastUpdateElement.textContent = `Последнее обновление: ${formatTime(updateDate)}`;
+                    }
+
+                    // Показываем метод парсинга, если есть
+                    if (data.method) {
+                        methodBadge.textContent = `Метод: ${formatMethod(data.method)}`;
+                        methodBadge.style.display = 'inline-block';
+                    } else {
+                        methodBadge.style.display = 'none';
+                    }
+
+                    // Сбрасываем счетчик повторов при успехе
+                    retryCount = 0;
+
+                } catch (fetchError) {
+                    clearTimeout(timeoutId);
+                    throw fetchError;
+                }
+
+            } catch (error) {
+                console.error('Ошибка получения цены:', error);
+                
+                retryCount++;
+                
+                if (retryCount < MAX_RETRIES) {
+                    // Повторяем запрос через 5 секунд
+                    statusElement.innerHTML = `Ошибка: ${error.message}. Повтор через 5 сек...`;
+                    statusElement.className = 'status error';
+                    
+                    setTimeout(() => {
+                        loadPrice();
+                    }, 5000);
+                } else {
+                    // После максимального количества повторов показываем ошибку
+                    priceElement.classList.remove('updating');
+                    priceElement.textContent = 'Ошибка';
+                    statusElement.innerHTML = `Ошибка: ${error.message}`;
+                    statusElement.className = 'status error';
+                    lastUpdateElement.textContent = '';
+                    methodBadge.style.display = 'none';
+                    
+                    // Сбрасываем счетчик через 30 секунд
+                    setTimeout(() => {
+                        retryCount = 0;
+                    }, 30000);
+                }
+            }
+        }
+
+        function init() {
+            // Первая загрузка
+            loadPrice();
+            
+            // Автообновление каждые 30 секунд
+            updateInterval = setInterval(loadPrice, 30000);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    </script>
+</body>
+</html>
+

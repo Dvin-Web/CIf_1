@@ -1,0 +1,20 @@
+{
+  "name": "grinex-price-tracker",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Grinex USDT/A7A5 price tracker using Node.js Express and Playwright for Render",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node check-dependencies.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "playwright": "^1.41.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
