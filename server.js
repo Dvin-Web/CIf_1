@@ -4,6 +4,7 @@ import playwright from 'playwright';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -93,12 +94,66 @@ app.get('/api/price', async (req, res) => {
   try {
     console.log('🚀 Начинаем получение цены...');
 
-    // Запускаем headless Chromium
+    // Запускаем headless Chromium (исправлено для Render)
     console.log('📦 Запуск браузера...');
-    browser = await playwright.chromium.launch({
+    
+    // Пробуем найти установленный chromium
+    const launchOptions = {
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Требуется для некоторых сред
-    });
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions'
+      ]
+    };
+    
+    // Пробуем разные варианты запуска
+    try {
+      // Вариант 1: Обычный запуск без указания пути (Playwright сам найдет)
+      browser = await playwright.chromium.launch(launchOptions);
+      console.log('✅ Браузер chromium запущен (автоматический поиск)');
+    } catch (launchError1) {
+      console.log('⚠️ Ошибка при запуске (вариант 1):', launchError1.message);
+      try {
+        // Вариант 2: Пробуем с прямым путем к chromium
+        const possiblePaths = [
+          '/opt/render/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
+          process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '',
+          join(process.env.HOME || '/opt/render', '.cache/ms-playwright/chromium-1194/chrome-linux/chrome')
+        ];
+        
+        let executableFound = false;
+        for (const execPath of possiblePaths) {
+          if (execPath && existsSync(execPath)) {
+            launchOptions.executablePath = execPath;
+            browser = await playwright.chromium.launch(launchOptions);
+            console.log('✅ Браузер chromium запущен (через executablePath):', execPath);
+            executableFound = true;
+            break;
+          }
+        }
+        
+        if (!executableFound) {
+          // Вариант 3: Пробуем без executablePath, но с меньшим количеством аргументов
+          const simpleOptions = {
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+          };
+          browser = await playwright.chromium.launch(simpleOptions);
+          console.log('✅ Браузер chromium запущен (упрощенный вариант)');
+        }
+      } catch (launchError2) {
+        console.error('❌ Все варианты запуска браузера не сработали:', launchError2.message);
+        throw new Error(`Не удалось запустить браузер: ${launchError2.message}`);
+      }
+    }
 
     // Создаём контекст с User-Agent
     context = await browser.newContext({
