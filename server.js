@@ -123,39 +123,110 @@ app.get('/api/price', async (req, res) => {
       console.log('⚠️ Ошибка при запуске (вариант 1):', launchError1.message);
       try {
         // Вариант 2: Пробуем найти установленный chromium в разных местах
-        const possiblePaths = [
-          process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
-          '/opt/render/.cache/ms-playwright/chromium-*/chrome-linux/chrome',
-          '/opt/render/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-          join(process.env.HOME || '/opt/render', '.cache/ms-playwright/chromium-1194/chrome-linux/chrome'),
-          join(process.env.HOME || '/home/render', '.cache/ms-playwright/chromium-1194/chrome-linux/chrome')
+        const homeDir = process.env.HOME || '/root';
+        const fs = await import('fs');
+        const path = await import('path');
+        
+        // Функция для поиска chromium в директории
+        const findChromiumInDir = (baseDir) => {
+          try {
+            const cacheDir = path.join(baseDir, '.cache/ms-playwright');
+            if (!fs.existsSync(cacheDir)) return null;
+            
+            const dirs = fs.readdirSync(cacheDir);
+            const chromiumDirs = dirs.filter(d => d.startsWith('chromium-') && !d.includes('headless_shell'));
+            
+            if (chromiumDirs.length === 0) return null;
+            
+            // Берем последнюю версию chromium (не headless_shell)
+            chromiumDirs.sort().reverse();
+            const latestChromium = chromiumDirs[0];
+            const chromePath = path.join(cacheDir, latestChromium, 'chrome-linux/chrome');
+            
+            if (fs.existsSync(chromePath)) {
+              return chromePath;
+            }
+            return null;
+          } catch (e) {
+            return null;
+          }
+        };
+        
+        // Список возможных путей для разных хостингов
+        const possibleBaseDirs = [
+          homeDir,              // Railway: /root
+          '/opt/render',        // Render.com
+          '/home/render',       // Render.com (альтернативный)
+          '/app',               // Docker/Railway альтернативный
+          process.env.HOME      // Переменная окружения
         ].filter(Boolean);
         
         let executableFound = false;
-        for (const execPath of possiblePaths) {
+        
+        // Пробуем найти chromium в разных местах
+        for (const baseDir of possibleBaseDirs) {
           try {
-            // Пробуем путь напрямую
-            if (execPath && existsSync(execPath)) {
-              launchOptions.executablePath = execPath;
+            const chromePath = findChromiumInDir(baseDir);
+            if (chromePath && existsSync(chromePath)) {
+              console.log('🔍 Найден chromium:', chromePath);
+              launchOptions.executablePath = chromePath;
               browser = await playwright.chromium.launch(launchOptions);
-              console.log('✅ Браузер chromium запущен (через executablePath):', execPath);
+              console.log('✅ Браузер chromium запущен (через executablePath):', chromePath);
               executableFound = true;
               break;
             }
           } catch (pathError) {
-            // Продолжаем пробовать другие пути
+            console.log('⚠️ Путь не найден:', baseDir);
             continue;
           }
         }
         
+        // Если переменная окружения установлена, пробуем её
+        if (!executableFound && process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+          try {
+            const envPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+            if (existsSync(envPath)) {
+              launchOptions.executablePath = envPath;
+              browser = await playwright.chromium.launch(launchOptions);
+              console.log('✅ Браузер chromium запущен (через переменную окружения):', envPath);
+              executableFound = true;
+            }
+          } catch (envError) {
+            console.log('⚠️ Переменная окружения не сработала:', envError.message);
+          }
+        }
+        
         if (!executableFound) {
-          // Вариант 3: Пробуем без executablePath, но с меньшим количеством аргументов
-          const simpleOptions = {
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-          };
-          browser = await playwright.chromium.launch(simpleOptions);
-          console.log('✅ Браузер chromium запущен (упрощенный вариант)');
+          // Вариант 3: Попробуем установить chromium автоматически
+          try {
+            console.log('⚠️ Браузер не найден, пробуем установить...');
+            const { execSync } = await import('child_process');
+            execSync('npx playwright install chromium', { 
+              stdio: 'inherit', 
+              timeout: 120000,
+              cwd: process.cwd()
+            });
+            console.log('✅ Chromium установлен, пробуем запустить...');
+            // Пробуем снова после установки
+            browser = await playwright.chromium.launch(launchOptions);
+            console.log('✅ Браузер chromium установлен и запущен');
+            executableFound = true;
+          } catch (installError) {
+            console.log('⚠️ Автоустановка не удалась:', installError.message);
+            // Вариант 4: Пробуем без executablePath, но с меньшим количеством аргументов
+            try {
+              const simpleOptions = {
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+              };
+              browser = await playwright.chromium.launch(simpleOptions);
+              console.log('✅ Браузер chromium запущен (упрощенный вариант)');
+              executableFound = true;
+            } catch (simpleError) {
+              console.error('❌ Все варианты запуска браузера не сработали');
+              throw new Error(`Не удалось запустить браузер. Убедись, что chromium установлен: npx playwright install chromium`);
+            }
+          }
         }
       } catch (launchError2) {
         console.error('❌ Все варианты запуска браузера не сработали:', launchError2.message);
